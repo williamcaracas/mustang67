@@ -1,0 +1,2605 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mustang '67 - Mi Caballo</title>
+    <!-- PWA -->
+    <link rel="manifest" href="./manifest.json">
+    <meta name="theme-color" content="#e8621a">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Mustang 67">
+    <link rel="apple-touch-icon" href="./icons/icon-192.png">
+    <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@300;400;500;600&family=Orbitron:wght@400;600;700;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        /* Leaflet map overrides */
+        #stationsMap { border-radius: 12px; z-index: 1; }
+        .leaflet-popup-content-wrapper {
+            background: #16162a;
+            border: 1px solid rgba(196,30,58,0.4);
+            border-radius: 10px;
+            color: #f0f0fa;
+            font-family: 'Inter', sans-serif;
+        }
+        .leaflet-popup-tip { background: #16162a; }
+        .map-marker-label { font-family: 'Orbitron', sans-serif; font-size: 0.6rem; }
+        .geo-btn {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: rgba(41,182,246,0.1);
+            border: 1px solid rgba(41,182,246,0.4);
+            color: var(--blue);
+            padding: 10px 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-family: 'Orbitron', sans-serif;
+            font-size: 0.65rem;
+            font-weight: 600;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            transition: all 0.25s;
+            width: 100%;
+            justify-content: center;
+        }
+        .geo-btn:hover { background: rgba(41,182,246,0.2); box-shadow: 0 0 14px rgba(41,182,246,0.3); }
+        .geo-btn.success { background: rgba(0,230,118,0.1); border-color: rgba(0,230,118,0.4); color: var(--green); }
+        .geo-btn.error   { background: rgba(196,30,58,0.1); border-color: rgba(196,30,58,0.4); color: #ff6b6b; }
+        .price-indicator {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 0.75rem;
+            padding: 3px 10px;
+            border-radius: 6px;
+            margin-top: 4px;
+        }
+        .price-good  { background: rgba(0,230,118,0.1); color: var(--green); }
+        .price-bad   { background: rgba(196,30,58,0.1); color: #ff6b6b; }
+        .price-avg   { background: rgba(245,166,35,0.1); color: var(--amber); }
+    </style>
+    <style>
+        :root {
+            --mustang-red: #c41e3a;
+            --mustang-dark: #8b0000;
+            --mustang-glow: rgba(196,30,58,0.4);
+            --chrome: #a8a8b3;
+            --chrome-light: #e0e0e8;
+            --black: #080810;
+            --dark-gray: #12121e;
+            --card-bg: rgba(20,20,35,0.85);
+            --card-border: rgba(168,168,179,0.18);
+            --amber: #f5a623;
+            --white: #f0f0fa;
+            --green: #00e676;
+            --blue: #29b6f6;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: radial-gradient(ellipse at top, #1a0a10 0%, var(--black) 60%);
+            background-attachment: fixed;
+            color: var(--white);
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        /* ── Header ─────────────────────────────── */
+        .header {
+            background: linear-gradient(180deg, #0a0005 0%, #1c0008 40%, #2a000e 100%);
+            padding: 28px 20px 22px;
+            text-align: center;
+            border-bottom: 1px solid rgba(196,30,58,0.5);
+            box-shadow: 0 4px 40px rgba(196,30,58,0.3);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .header::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: radial-gradient(ellipse at 50% -20%, rgba(196,30,58,0.25) 0%, transparent 65%);
+            pointer-events: none;
+        }
+
+        .mustang-logo {
+            font-size: 2.6rem;
+            margin-bottom: 6px;
+            display: inline-block;
+            filter: drop-shadow(0 0 12px rgba(196,30,58,0.8));
+            animation: float 3s ease-in-out infinite;
+        }
+
+        @keyframes float {
+            0%,100% { transform: translateY(0); }
+            50%  { transform: translateY(-5px); }
+        }
+
+        .header h1 {
+            font-family: 'Bebas Neue', sans-serif;
+            font-size: 3.4rem;
+            letter-spacing: 8px;
+            background: linear-gradient(180deg, #ffffff 0%, #c41e3a 60%, #8b0000 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            line-height: 1;
+            text-shadow: none;
+        }
+
+        .header .subtitle {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 0.7rem;
+            font-weight: 400;
+            color: var(--chrome);
+            margin-top: 6px;
+            letter-spacing: 7px;
+            text-transform: uppercase;
+            opacity: 0.85;
+        }
+
+        /* ── Navigation ─────────────────────────── */
+        .nav {
+            display: flex;
+            justify-content: center;
+            gap: 8px;
+            padding: 14px 20px;
+            background: rgba(8,8,16,0.95);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid var(--card-border);
+            flex-wrap: wrap;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .nav-btn {
+            background: transparent;
+            border: 1px solid transparent;
+            color: var(--chrome);
+            padding: 9px 22px;
+            font-family: 'Orbitron', sans-serif;
+            font-size: 0.65rem;
+            font-weight: 600;
+            cursor: pointer;
+            border-radius: 50px;
+            transition: all 0.25s ease;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+
+        .nav-btn:hover {
+            color: #fff;
+            background: rgba(196,30,58,0.15);
+            border-color: rgba(196,30,58,0.4);
+        }
+
+        .nav-btn.active {
+            background: linear-gradient(135deg, var(--mustang-red), var(--mustang-dark));
+            border-color: transparent;
+            color: #fff;
+            box-shadow: 0 0 18px var(--mustang-glow), 0 2px 8px rgba(0,0,0,0.4);
+        }
+
+        /* ── Main Content ────────────────────────── */
+        .main {
+            padding: 24px 20px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .section {
+            display: none;
+            animation: fadeIn 0.4s ease;
+        }
+
+        .section.active {
+            display: block;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(16px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+
+        /* ── Dashboard Grid ──────────────────────── */
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        /* ── Cards ───────────────────────────────── */
+        .card {
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 16px;
+            padding: 22px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.05);
+            backdrop-filter: blur(12px);
+            transition: box-shadow 0.3s ease, transform 0.3s ease;
+        }
+
+        .card:hover {
+            box-shadow: 0 12px 48px rgba(0,0,0,0.6), 0 0 0 1px rgba(196,30,58,0.2), inset 0 1px 0 rgba(255,255,255,0.08);
+            transform: translateY(-2px);
+        }
+
+        .card h2 {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 0.75rem;
+            font-weight: 700;
+            color: var(--mustang-red);
+            margin-bottom: 18px;
+            text-align: center;
+            letter-spacing: 3px;
+            text-transform: uppercase;
+            border-bottom: 1px solid rgba(196,30,58,0.25);
+            padding-bottom: 12px;
+        }
+
+        /* ── Fuel Gauge ──────────────────────────── */
+        .fuel-gauge-container {
+            position: relative;
+            width: 280px;
+            height: 200px;
+            margin: 16px auto;
+        }
+
+        .fuel-gauge {
+            position: relative;
+            width: 100%;
+            height: 100%;
+        }
+
+        .gauge-bg {
+            fill: none;
+            stroke: rgba(255,255,255,0.05);
+            stroke-width: 25;
+            stroke-linecap: round;
+        }
+
+        .gauge-fill {
+            fill: none;
+            stroke: url(#fuelGradient);
+            stroke-width: 25;
+            stroke-linecap: round;
+            stroke-dasharray: 440;
+            stroke-dashoffset: 440;
+            transition: stroke-dashoffset 1.2s cubic-bezier(.4,0,.2,1);
+            filter: drop-shadow(0 0 6px rgba(196,30,58,0.6));
+        }
+
+        .gauge-labels {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 13px;
+            fill: var(--chrome);
+        }
+
+        .gauge-needle {
+            transform-origin: 140px 140px;
+            transition: transform 1.2s cubic-bezier(.4,0,.2,1);
+        }
+
+        .gauge-needle path {
+            fill: var(--mustang-red);
+            filter: drop-shadow(2px 2px 4px rgba(0,0,0,0.8));
+        }
+
+        .gauge-center {
+            fill: var(--chrome);
+        }
+
+        .digital-readout {
+            text-align: center;
+            margin-top: 8px;
+            font-family: 'Orbitron', sans-serif;
+            font-size: 2rem;
+            font-weight: 700;
+            color: var(--amber);
+            text-shadow: 0 0 20px rgba(245,166,35,0.6);
+            letter-spacing: 2px;
+        }
+
+        .gauge-label {
+            text-align: center;
+            color: var(--chrome);
+            font-family: 'Orbitron', sans-serif;
+            font-size: 0.6rem;
+            margin-top: 4px;
+            letter-spacing: 3px;
+            text-transform: uppercase;
+        }
+
+        .fuel-reserve-alert {
+            text-align: center;
+            font-size: 0.85rem;
+            font-weight: 500;
+            padding: 10px 14px;
+            margin-top: 14px;
+            border-radius: 8px;
+            background: rgba(255,255,255,0.04);
+            border: 1px solid rgba(255,255,255,0.08);
+        }
+
+        /* ── Stats Grid ──────────────────────────── */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+            margin-top: 14px;
+        }
+
+        .stat-item {
+            background: rgba(255,255,255,0.03);
+            border: 1px solid rgba(255,255,255,0.07);
+            border-radius: 10px;
+            padding: 14px;
+            text-align: center;
+            transition: background 0.2s;
+        }
+
+        .stat-item:hover {
+            background: rgba(196,30,58,0.08);
+        }
+
+        .stat-value {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 1.35rem;
+            font-weight: 700;
+            color: var(--green);
+            text-shadow: 0 0 10px rgba(0,230,118,0.4);
+            letter-spacing: 1px;
+        }
+
+        .stat-label {
+            color: var(--chrome);
+            font-size: 0.7rem;
+            font-weight: 500;
+            margin-top: 4px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        /* ── Forms ───────────────────────────────── */
+        .form-group {
+            margin-bottom: 18px;
+        }
+
+        .form-group label {
+            display: block;
+            color: var(--chrome);
+            margin-bottom: 7px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+        }
+
+        .form-group input,
+        .form-group select,
+        .form-group textarea {
+            width: 100%;
+            padding: 11px 14px;
+            background: rgba(255,255,255,0.04);
+            border: 1px solid var(--card-border);
+            border-radius: 8px;
+            color: var(--white);
+            font-family: 'Inter', sans-serif;
+            font-size: 0.95rem;
+            transition: border-color 0.25s, box-shadow 0.25s;
+        }
+
+        .form-group input:focus,
+        .form-group select:focus,
+        .form-group textarea:focus {
+            outline: none;
+            border-color: var(--mustang-red);
+            box-shadow: 0 0 0 3px rgba(196,30,58,0.15);
+            background: rgba(196,30,58,0.05);
+        }
+
+        .form-group select option {
+            background: #1a1a2e;
+        }
+
+        .form-group textarea {
+            resize: vertical;
+            min-height: 80px;
+        }
+
+        .btn {
+            background: linear-gradient(135deg, var(--mustang-red) 0%, var(--mustang-dark) 100%);
+            border: none;
+            color: #fff;
+            padding: 13px 28px;
+            font-family: 'Orbitron', sans-serif;
+            font-size: 0.7rem;
+            font-weight: 700;
+            cursor: pointer;
+            border-radius: 8px;
+            transition: all 0.25s ease;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            width: 100%;
+            box-shadow: 0 4px 16px rgba(196,30,58,0.3);
+        }
+
+        .btn:hover {
+            box-shadow: 0 6px 28px rgba(196,30,58,0.55);
+            transform: translateY(-2px);
+            filter: brightness(1.1);
+        }
+
+        .btn:active {
+            transform: translateY(0);
+        }
+
+        .btn-secondary {
+            background: rgba(255,255,255,0.05);
+            border: 1px solid var(--card-border);
+            box-shadow: none;
+        }
+
+        .btn-secondary:hover {
+            background: rgba(255,255,255,0.1);
+            box-shadow: none;
+            border-color: var(--chrome);
+        }
+
+        /* ── Tables ──────────────────────────────── */
+        .table-container {
+            overflow-x: auto;
+            margin-top: 18px;
+            border-radius: 10px;
+            border: 1px solid var(--card-border);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th, td {
+            padding: 11px 14px;
+            text-align: left;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+            font-size: 0.88rem;
+        }
+
+        th {
+            background: rgba(196,30,58,0.2);
+            color: var(--chrome-light);
+            text-transform: uppercase;
+            font-size: 0.65rem;
+            font-weight: 600;
+            letter-spacing: 1.5px;
+            font-family: 'Orbitron', sans-serif;
+        }
+
+        tr:last-child td { border-bottom: none; }
+
+        tr:hover td {
+            background: rgba(196,30,58,0.08);
+        }
+
+        /* ── Maintenance Items ───────────────────── */
+        .maintenance-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 14px;
+        }
+
+        .maintenance-item {
+            background: rgba(255,255,255,0.03);
+            border: 1px solid var(--card-border);
+            border-radius: 12px;
+            padding: 16px;
+            transition: all 0.25s ease;
+        }
+
+        .maintenance-item.due-soon {
+            border-color: rgba(245,166,35,0.5);
+            box-shadow: 0 0 16px rgba(245,166,35,0.15);
+        }
+
+        .maintenance-item.overdue {
+            border-color: rgba(196,30,58,0.6);
+            box-shadow: 0 0 16px rgba(196,30,58,0.2);
+        }
+
+        .maintenance-item.ok {
+            border-color: rgba(0,230,118,0.3);
+        }
+
+        .maintenance-item-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .maintenance-item-title {
+            font-size: 0.95rem;
+            font-weight: 600;
+            color: var(--white);
+        }
+
+        .maintenance-item-status {
+            font-size: 0.65rem;
+            font-family: 'Orbitron', sans-serif;
+            padding: 3px 10px;
+            border-radius: 20px;
+            text-transform: uppercase;
+            font-weight: 700;
+            letter-spacing: 1px;
+        }
+
+        .status-ok      { background: rgba(0,230,118,0.15); color: var(--green); border: 1px solid rgba(0,230,118,0.3); }
+        .status-warning { background: rgba(245,166,35,0.15); color: var(--amber); border: 1px solid rgba(245,166,35,0.3); }
+        .status-danger  { background: rgba(196,30,58,0.2); color: #ff6b6b; border: 1px solid rgba(196,30,58,0.4); }
+
+        .maintenance-item-details {
+            color: var(--chrome);
+            font-size: 0.82rem;
+            line-height: 1.6;
+        }
+
+        .maintenance-item-bar {
+            height: 6px;
+            background: rgba(255,255,255,0.06);
+            border-radius: 3px;
+            margin-top: 12px;
+            overflow: hidden;
+        }
+
+        .maintenance-item-bar-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--green), var(--amber), var(--mustang-red));
+            border-radius: 3px;
+            transition: width 0.6s ease;
+        }
+
+        /* ── Chart Container ─────────────────────── */
+        .chart-container {
+            position: relative;
+            height: 300px;
+            margin-top: 16px;
+        }
+
+        /* ── Modal ───────────────────────────────── */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.75);
+            backdrop-filter: blur(6px);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .modal.active {
+            display: flex;
+            animation: fadeIn 0.2s ease;
+        }
+
+        .modal-content {
+            background: linear-gradient(145deg, #16162a 0%, #0d0d1a 100%);
+            border: 1px solid var(--card-border);
+            border-radius: 16px;
+            padding: 28px;
+            max-width: 500px;
+            width: 90%;
+            max-height: 90vh;
+            overflow-y: auto;
+            box-shadow: 0 24px 64px rgba(0,0,0,0.7), 0 0 0 1px rgba(196,30,58,0.15);
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 22px;
+        }
+
+        .modal-header h2 {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 0.8rem;
+            color: var(--mustang-red);
+            letter-spacing: 2px;
+        }
+
+        .modal-close {
+            background: rgba(255,255,255,0.06);
+            border: 1px solid var(--card-border);
+            color: var(--chrome);
+            font-size: 1.2rem;
+            cursor: pointer;
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+        }
+
+        .modal-close:hover {
+            background: rgba(196,30,58,0.2);
+            color: var(--mustang-red);
+            border-color: var(--mustang-red);
+        }
+
+        /* ── Scrollbar ───────────────────────────── */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: var(--black); }
+        ::-webkit-scrollbar-thumb { background: rgba(196,30,58,0.5); border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--mustang-red); }
+
+        /* ── Animations ──────────────────────────── */
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50%       { opacity: 0.4; }
+        }
+
+        .pulse { animation: pulse 1.8s infinite; }
+
+        /* ── Badge ───────────────────────────────── */
+        .badge {
+            display: inline-block;
+            padding: 2px 10px;
+            border-radius: 20px;
+            font-size: 0.65rem;
+            font-family: 'Orbitron', sans-serif;
+            text-transform: uppercase;
+            font-weight: 700;
+            letter-spacing: 1px;
+        }
+
+        .badge-fuel { background: rgba(41,182,246,0.2); color: var(--blue); border: 1px solid rgba(41,182,246,0.3); }
+        .badge-oil  { background: rgba(245,166,35,0.2); color: var(--amber); border: 1px solid rgba(245,166,35,0.3); }
+        .badge-tires { background: rgba(0,230,118,0.15); color: var(--green); border: 1px solid rgba(0,230,118,0.3); }
+        .badge-brakes { background: rgba(196,30,58,0.2); color: #ff6b6b; border: 1px solid rgba(196,30,58,0.35); }
+        .badge-engine { background: rgba(156,39,176,0.2); color: #ce93d8; border: 1px solid rgba(156,39,176,0.35); }
+        .badge-suspension { background: rgba(41,182,246,0.15); color: #81d4fa; border: 1px solid rgba(41,182,246,0.3); }
+        .badge-cooling { background: rgba(0,230,118,0.1); color: #69f0ae; border: 1px solid rgba(0,230,118,0.25); }
+        .badge-transmission { background: rgba(255,152,0,0.15); color: #ffcc80; border: 1px solid rgba(255,152,0,0.3); }
+        .badge-electrical { background: rgba(255,235,59,0.15); color: #fff176; border: 1px solid rgba(255,235,59,0.3); }
+        .badge-custom { background: rgba(168,168,179,0.15); color: var(--chrome-light); border: 1px solid rgba(168,168,179,0.3); }
+
+        /* ── Responsive ──────────────────────────── */
+        @media (max-width: 600px) {
+            .header h1 { font-size: 2.4rem; }
+            .nav { gap: 5px; }
+            .nav-btn { padding: 8px 14px; font-size: 0.58rem; }
+            .dashboard-grid { grid-template-columns: 1fr; }
+            .stats-grid { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <div class="mustang-logo">🐎</div>
+        <h1>MUSTANG '67</h1>
+        <div class="subtitle">MI CABALLO DE HIERRO</div>
+    </header>
+
+    <!-- Navigation -->
+    <nav class="nav">
+        <button class="nav-btn active" data-section="dashboard">Tablero</button>
+        <button class="nav-btn" data-section="fuel">Combustible</button>
+        <button class="nav-btn" data-section="mapview">🗺️ Mapa</button>
+        <button class="nav-btn" data-section="maintenance">Mantenimiento</button>
+        <button class="nav-btn" data-section="stats">Estadísticas</button>
+        <button class="nav-btn" data-section="settings">Config</button>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="main">
+        <!-- Dashboard Section -->
+        <section id="dashboard" class="section active">
+            <div class="dashboard-grid">
+                <!-- Fuel Gauge Card -->
+                <div class="card">
+                    <h2>⛽ NIVEL DE GASOLINA</h2>
+                    <div class="fuel-gauge-container">
+                        <svg class="fuel-gauge" viewBox="0 0 280 200">
+                            <defs>
+                                <linearGradient id="fuelGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                                    <stop offset="0%" style="stop-color:var(--mustang-red)"/>
+                                    <stop offset="50%" style="stop-color:var(--amber)"/>
+                                    <stop offset="100%" style="stop-color:var(--green)"/>
+                                </linearGradient>
+                                <linearGradient id="tachGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                                    <stop offset="0%" style="stop-color:var(--green)"/>
+                                    <stop offset="50%" style="stop-color:var(--amber)"/>
+                                    <stop offset="100%" style="stop-color:var(--mustang-red)"/>
+                                </linearGradient>
+                            </defs>
+                            <!-- Background arc -->
+                            <path class="gauge-bg" d="M 40 140 A 100 100 0 0 1 240 140"/>
+                            <!-- Fill arc -->
+                            <path class="gauge-fill" id="fuelGaugeFill" d="M 40 140 A 100 100 0 0 1 240 140"/>
+                            <!-- Labels -->
+                            <text class="gauge-labels" x="45" y="165">E</text>
+                            <text class="gauge-labels" x="135" y="130">1/2</text>
+                            <text class="gauge-labels" x="230" y="165">F</text>
+                            <!-- Needle -->
+                            <g class="gauge-needle" id="fuelNeedle">
+                                <path d="M 135 135 L 145 135 L 140 60 Z"/>
+                                <circle class="gauge-center" cx="140" cy="140" r="10"/>
+                            </g>
+                        </svg>
+                    </div>
+                    <div class="digital-readout" id="fuelDigital">-- L</div>
+                    <div class="gauge-label">LITROS EN TANQUE</div>
+                    <div class="fuel-reserve-alert" id="fuelReserveAlert">⏳ Registrá tu primer tanque para calcular</div>
+
+                    <div class="stats-grid">
+                        <div class="stat-item">
+                            <div class="stat-value" id="dashRange">-- km</div>
+                            <div class="stat-label">Autonomía</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-value" id="dashEfficiency">-- km/L</div>
+                            <div class="stat-label">Eficiencia</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Next Maintenance Card -->
+                <div class="card">
+                    <h2>🔧 PRÓXIMO MANTENIMIENTO</h2>
+                    <div id="nextMaintenanceList">
+                        <p style="text-align: center; color: var(--chrome-light);">Cargando...</p>
+                    </div>
+                </div>
+
+                <!-- Quick Stats Card -->
+                <div class="card">
+                    <h2>📊 RESUMEN DEL MES</h2>
+                    <div class="stats-grid">
+                        <div class="stat-item">
+                            <div class="stat-value" id="monthFuel">-- L</div>
+                            <div class="stat-label">Gasolina este mes</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-value" id="monthSpent">$--</div>
+                            <div class="stat-label">Gastado este mes</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-value" id="totalKm">-- km</div>
+                            <div class="stat-label">Recorrido este mes</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-value" id="avgEfficiency">-- km/L</div>
+                            <div class="stat-label">Eficiencia promedio</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Quick Add Card -->
+                <div class="card">
+                    <h2>⚡ ACCIONES RÁPIDAS</h2>
+                    <div style="display: flex; flex-direction: column; gap: 10px;">
+                        <button class="btn" onclick="openModal('fuelModal')">+ Registrar Gasolina</button>
+                        <button class="btn btn-secondary" onclick="openModal('maintenanceModal')">+ Registrar Mantenimiento</button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Map Section -->
+        <section id="mapview" class="section">
+            <div class="card">
+                <h2>🗺️ MAPA DE PARADAS</h2>
+                <div style="display:flex;gap:12px;margin-bottom:14px;flex-wrap:wrap;">
+                    <div class="stat-item" style="flex:1;min-width:120px;">
+                        <div class="stat-value" id="mapTotalStops" style="color:var(--blue);">--</div>
+                        <div class="stat-label">Paradas registradas</div>
+                    </div>
+                    <div class="stat-item" style="flex:1;min-width:120px;">
+                        <div class="stat-value" id="mapAvgPrice" style="color:var(--amber);">--</div>
+                        <div class="stat-label">Precio promedio /L</div>
+                    </div>
+                    <div class="stat-item" style="flex:1;min-width:120px;">
+                        <div class="stat-value" id="mapBestPrice" style="color:var(--green);">--</div>
+                        <div class="stat-label">Mejor precio /L</div>
+                    </div>
+                </div>
+                <div id="stationsMap" style="height:420px;width:100%;"></div>
+                <p style="margin-top:10px;font-size:0.78rem;color:var(--chrome);text-align:center;">Solo se muestran paradas con coordenadas GPS capturadas. Usa el botón 📍 al registrar combustible.</p>
+            </div>
+
+            <div class="card" style="margin-top:20px;">
+                <h2>📍 PARADAS CON UBICACIÓN</h2>
+                <div class="table-container">
+                    <table id="mapStopsTable">
+                        <thead>
+                            <tr>
+                                <th>Fecha</th>
+                                <th>Estación</th>
+                                <th>Tipo</th>
+                                <th>Precio/L</th>
+                                <th>Litros</th>
+                                <th>Total</th>
+                                <th>Notas</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- Fuel Section -->
+        <section id="fuel" class="section">
+            <div class="card">
+                <h2>⛽ REGISTRAR NUEVO TANQUE</h2>
+                <form id="fuelForm">
+                    <div class="dashboard-grid">
+                        <div class="form-group">
+                            <label>Fecha</label>
+                            <input type="date" id="fuelDate" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Odómetro (km)</label>
+                            <input type="number" id="fuelOdometer" placeholder="Ej: 85420" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Litros</label>
+                            <input type="number" id="fuelLiters" step="0.01" placeholder="Ej: 45.5" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Precio por litro ($)</label>
+                            <input type="number" id="fuelPrice" step="0.01" placeholder="Ej: 1.45" required>
+                            <div id="priceIndicator" style="margin-top:6px;"></div>
+                        </div>
+                        <div class="form-group">
+                            <label>Tipo de combustible</label>
+                            <select id="fuelGrade">
+                                <option value="regular">Regular (87 oct)</option>
+                                <option value="plus">Plus (89 oct)</option>
+                                <option value="premium" selected>Premium (91+ oct)</option>
+                                <option value="diesel">Diesel</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Tanque lleno</label>
+                            <select id="fuelFull">
+                                <option value="true">Sí - Tanque completo</option>
+                                <option value="false">No - Parcial</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Litros previos estimados (opcional)</label>
+                            <input type="number" id="fuelBefore" step="0.1" min="0" placeholder="¿Cuántos L había antes? Ej: 5">
+                            <div style="margin-top:5px; font-size:0.72rem; color:var(--chrome);">Si lo sabes, esto mejora el cálculo de autonomía 🎯</div>
+                        </div>
+                        <div class="form-group">
+                            <label>Estación de servicio</label>
+                            <input type="text" id="fuelStation" placeholder="Se rellena automáticamente con GPS">
+                        </div>
+                        <div class="form-group">
+                            <label>Notas de ruta</label>
+                            <input type="text" id="fuelTripNotes" placeholder="Ej: Viaje por la costa, tráfico moderado">
+                        </div>
+                    </div>
+                    <!-- GPS Capture -->
+                    <div class="form-group" style="margin-bottom:18px;">
+                        <label>Ubicación GPS</label>
+                        <button type="button" class="geo-btn" id="geoBtn" onclick="captureLocation()">
+                            📍 Capturar ubicación actual
+                        </button>
+                        <input type="hidden" id="fuelLat">
+                        <input type="hidden" id="fuelLng">
+                        <div id="geoAddress" style="margin-top:8px; font-size:0.8rem; color:var(--chrome); min-height:18px;"></div>
+                    </div>
+                    <button type="submit" class="btn">Guardar Registro</button>
+                </form>
+            </div>
+
+            <div class="card" style="margin-top: 20px;">
+                <h2>ℹ️ ¿CÓMO FUNCIONA?</h2>
+                <div style="color: var(--chrome-light); line-height: 1.8;">
+                    <p>🐎 <strong>Para que el medidor funcione:</strong></p>
+                    <ol style="margin-left: 20px; margin-top: 10px;">
+                        <li>Cada vez que eches gasolina, anota los <strong>km del odómetro</strong></li>
+                        <li>Registra los <strong>litros que le pusiste</strong></li>
+                        <li>La app calcula automáticamente tu consumo real</li>
+                        <li>El medidor te dirá cuánta gasolina queda y cuándo echar más</li>
+                    </ol>
+                    <p style="margin-top: 15px;">⛽ <strong>Importante:</strong> Marca "Tanque lleno" solo cuando llenes hasta el tope. Así la app puede calcular exactamente cuánto consumiste desde el último tanque.</p>
+                </div>
+            </div>
+
+            <div class="card" style="margin-top: 20px;">
+                <h2>📋 HISTORIAL DE COMBUSTIBLE</h2>
+                <div class="table-container">
+                    <table id="fuelHistoryTable">
+                        <thead>
+                            <tr>
+                                <th>Tipo</th>
+                                <th>Fecha</th>
+                                <th>Km</th>
+                                <th>Litros</th>
+                                <th>Precio/L</th>
+                                <th>Total</th>
+                                <th>Estación</th>
+                                <th>Km/L</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- Maintenance Section -->
+        <section id="maintenance" class="section">
+            <div class="card">
+                <h2>🔧 REGISTRAR MANTENIMIENTO</h2>
+                <form id="maintenanceForm">
+                    <div class="dashboard-grid">
+                        <div class="form-group">
+                            <label>Fecha</label>
+                            <input type="date" id="maintDate" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Odómetro (km)</label>
+                            <input type="number" id="maintOdometer" placeholder="Ej: 85420" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Categoría</label>
+                            <select id="maintCategory" required onchange="updateMaintItems()">
+                                <option value="">Seleccionar...</option>
+                                <option value="engine">Motor</option>
+                                <option value="oil">Aceite</option>
+                                <option value="suspension">Suspensión</option>
+                                <option value="brakes">Frenos</option>
+                                <option value="tires">Neumáticos</option>
+                                <option value="cooling">Refrigeración</option>
+                                <option value="transmission">Transmisión</option>
+                                <option value="electrical">Eléctrico</option>
+                                <option value="custom">Personalizado</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Ítem</label>
+                            <select id="maintItem" required>
+                                <option value="">Primero selecciona categoría</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Costo ($)</label>
+                            <input type="number" id="maintCost" step="0.01" placeholder="Ej: 150.00">
+                        </div>
+                        <div class="form-group">
+                            <label>Próximo cambio (km)</label>
+                            <input type="number" id="maintNextKm" placeholder="Ej: 5000 (para aceite)">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Notas</label>
+                        <textarea id="maintNotes" placeholder="Detalles adicionales..."></textarea>
+                    </div>
+                    <button type="submit" class="btn">Guardar Mantenimiento</button>
+                </form>
+            </div>
+
+            <div class="card" style="margin-top: 20px;">
+                <h2>📋 ESTADO DE MANTENIMIENTO</h2>
+                <div class="maintenance-grid" id="maintenanceGrid"></div>
+            </div>
+
+            <div class="card" style="margin-top: 20px;">
+                <h2>📜 HISTORIAL DE MANTENIMIENTO</h2>
+                <div class="table-container">
+                    <table id="maintHistoryTable">
+                        <thead>
+                            <tr>
+                                <th>Fecha</th>
+                                <th>Km</th>
+                                <th>Categoría</th>
+                                <th>Ítem</th>
+                                <th>Costo</th>
+                                <th>Próximo</th>
+                                <th>Notas</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- Stats Section -->
+        <section id="stats" class="section">
+            <div class="dashboard-grid">
+                <div class="card">
+                    <h2>📈 EFICIENCIA DE COMBUSTIBLE</h2>
+                    <div class="chart-container">
+                        <canvas id="efficiencyChart"></canvas>
+                    </div>
+                </div>
+                <div class="card">
+                    <h2>💰 GASTOS MENSUALES</h2>
+                    <div class="chart-container">
+                        <canvas id="expensesChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card" style="margin-top: 20px;">
+                <h2>🏆 ESTADÍSTICAS GENERALES</h2>
+                <div class="stats-grid" style="grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));">
+                    <div class="stat-item">
+                        <div class="stat-value" id="statTotalFuel">-- L</div>
+                        <div class="stat-label">Total gasolina</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value" id="statTotalSpent">$--</div>
+                        <div class="stat-label">Total gastado</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value" id="statBestEfficiency">-- km/L</div>
+                        <div class="stat-label">Mejor eficiencia</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value" id="statAvgEfficiency">-- km/L</div>
+                        <div class="stat-label">Eficiencia promedio</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value" id="statTotalMaint">$--</div>
+                        <div class="stat-label">Mantenimiento total</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value" id="statRecords">--</div>
+                        <div class="stat-label">Registros totales</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 💵 Costo por Kilómetro -->
+            <div class="card" style="margin-top: 20px;">
+                <h2>💵 COSTO POR KILÓMETRO</h2>
+                <div class="stats-grid" style="grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));">
+                    <div class="stat-item">
+                        <div class="stat-value" id="costPerKmFuel" style="color: var(--amber);">$--</div>
+                        <div class="stat-label">Gasolina / km</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value" id="costPerKmMaint" style="color: var(--blue);">$--</div>
+                        <div class="stat-label">Mantenimiento / km</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value" id="costPerKmTotal" style="color: var(--mustang-red);">$--</div>
+                        <div class="stat-label">Costo total / km</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value" id="totalKmDriven" style="color: var(--green);">-- km</div>
+                        <div class="stat-label">Km recorridos total</div>
+                    </div>
+                </div>
+                <div id="costPerKmBar" style="margin-top: 18px; background: rgba(255,255,255,0.04); border-radius: 10px; padding: 14px; border: 1px solid rgba(255,255,255,0.07);">
+                    <div style="display: flex; justify-content: space-between; font-size: 0.75rem; color: var(--chrome); margin-bottom: 8px;">
+                        <span>Gasolina</span>
+                        <span>Mantenimiento</span>
+                    </div>
+                    <div style="height: 10px; border-radius: 5px; overflow: hidden; display: flex; background: rgba(255,255,255,0.06);">
+                        <div id="costBarFuel" style="height: 100%; background: linear-gradient(90deg, var(--amber), #ff9800); transition: width 0.6s;"></div>
+                        <div id="costBarMaint" style="height: 100%; background: linear-gradient(90deg, var(--blue), #0288d1); transition: width 0.6s;"></div>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; font-size: 0.7rem; color: var(--chrome); margin-top: 6px;">
+                        <span id="costBarFuelPct">--%</span>
+                        <span id="costBarMaintPct">--%</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 📅 Distancia Mensual -->
+            <div class="card" style="margin-top: 20px;">
+                <h2>📅 DISTANCIA MENSUAL</h2>
+                <div class="chart-container">
+                    <canvas id="monthlyDistanceChart"></canvas>
+                </div>
+            </div>
+
+            <!-- ⏱️ Frecuencia de Recarga -->
+            <div class="card" style="margin-top: 20px;">
+                <h2>⏱️ FRECUENCIA DE RECARGA</h2>
+                <div class="stats-grid" style="grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));">
+                    <div class="stat-item">
+                        <div class="stat-value" id="avgDaysBetween" style="color: var(--blue);">-- días</div>
+                        <div class="stat-label">Promedio entre recargas</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value" id="avgKmBetween" style="color: var(--green);">-- km</div>
+                        <div class="stat-label">Km entre recargas</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value" id="avgLitersPerFill" style="color: var(--amber);">-- L</div>
+                        <div class="stat-label">Litros promedio/recarga</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value" id="fillsPerMonth" style="color: var(--mustang-red);">--</div>
+                        <div class="stat-label">Recargas por mes</div>
+                    </div>
+                </div>
+                <div id="refuelTimeline" style="margin-top: 18px; padding: 14px; background: rgba(255,255,255,0.03); border-radius: 10px; border: 1px solid rgba(255,255,255,0.07);">
+                    <div style="font-family: 'Orbitron', sans-serif; font-size: 0.65rem; color: var(--chrome); text-transform: uppercase; letter-spacing: 2px; margin-bottom: 10px;">Últimas recargas</div>
+                    <div id="refuelTimelineBars" style="display: flex; flex-direction: column; gap: 6px;"></div>
+                </div>
+            </div>
+
+            <!-- 🏆 Récords Personales -->
+            <div class="card" style="margin-top: 20px;">
+                <h2>🏆 RÉCORDS PERSONALES</h2>
+                <div class="stats-grid" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));">
+                    <div class="stat-item" style="border-left: 3px solid var(--green); text-align: left; padding-left: 18px;">
+                        <div class="stat-value" style="font-size: 1.1rem;" id="recordBestEff">--</div>
+                        <div class="stat-label">🥇 Mejor eficiencia</div>
+                        <div style="font-size: 0.7rem; color: var(--chrome); margin-top: 2px;" id="recordBestEffDate"></div>
+                    </div>
+                    <div class="stat-item" style="border-left: 3px solid var(--mustang-red); text-align: left; padding-left: 18px;">
+                        <div class="stat-value" style="font-size: 1.1rem; color: var(--mustang-red);" id="recordWorstEff">--</div>
+                        <div class="stat-label">📉 Peor eficiencia</div>
+                        <div style="font-size: 0.7rem; color: var(--chrome); margin-top: 2px;" id="recordWorstEffDate"></div>
+                    </div>
+                    <div class="stat-item" style="border-left: 3px solid var(--amber); text-align: left; padding-left: 18px;">
+                        <div class="stat-value" style="font-size: 1.1rem; color: var(--amber);" id="recordBiggestFill">--</div>
+                        <div class="stat-label">⛽ Mayor recarga</div>
+                        <div style="font-size: 0.7rem; color: var(--chrome); margin-top: 2px;" id="recordBiggestFillDate"></div>
+                    </div>
+                    <div class="stat-item" style="border-left: 3px solid var(--blue); text-align: left; padding-left: 18px;">
+                        <div class="stat-value" style="font-size: 1.1rem; color: var(--blue);" id="recordLongestStretch">--</div>
+                        <div class="stat-label">🛣️ Mayor distancia entre recargas</div>
+                        <div style="font-size: 0.7rem; color: var(--chrome); margin-top: 2px;" id="recordLongestStretchDate"></div>
+                    </div>
+                    <div class="stat-item" style="border-left: 3px solid #ce93d8; text-align: left; padding-left: 18px;">
+                        <div class="stat-value" style="font-size: 1.1rem; color: #ce93d8;" id="recordMostExpensive">--</div>
+                        <div class="stat-label">💸 Tanque más caro</div>
+                        <div style="font-size: 0.7rem; color: var(--chrome); margin-top: 2px;" id="recordMostExpensiveDate"></div>
+                    </div>
+                    <div class="stat-item" style="border-left: 3px solid #69f0ae; text-align: left; padding-left: 18px;">
+                        <div class="stat-value" style="font-size: 1.1rem; color: #69f0ae;" id="recordLongestDays">--</div>
+                        <div class="stat-label">📅 Más días sin recargar</div>
+                        <div style="font-size: 0.7rem; color: var(--chrome); margin-top: 2px;" id="recordLongestDaysDate"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 💰 Proyección de Gastos -->
+            <div class="card" style="margin-top: 20px;">
+                <h2>🔮 PROYECCIÓN DE GASTOS</h2>
+                <div id="projectionContent" style="color: var(--chrome-light); line-height: 1.8;">
+                    <p style="text-align: center;">Acumulando datos...</p>
+                </div>
+                <div class="stats-grid" style="grid-template-columns: repeat(3, 1fr); margin-top: 16px;">
+                    <div class="stat-item" style="border-top: 3px solid var(--green);">
+                        <div style="font-family: 'Orbitron', sans-serif; font-size: 0.6rem; color: var(--chrome); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px;" id="projMonth1Label">--</div>
+                        <div class="stat-value" style="font-size: 1.1rem;" id="projMonth1">$--</div>
+                        <div class="stat-label">Estimado</div>
+                    </div>
+                    <div class="stat-item" style="border-top: 3px solid var(--amber);">
+                        <div style="font-family: 'Orbitron', sans-serif; font-size: 0.6rem; color: var(--chrome); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px;" id="projMonth2Label">--</div>
+                        <div class="stat-value" style="font-size: 1.1rem; color: var(--amber);" id="projMonth2">$--</div>
+                        <div class="stat-label">Estimado</div>
+                    </div>
+                    <div class="stat-item" style="border-top: 3px solid var(--mustang-red);">
+                        <div style="font-family: 'Orbitron', sans-serif; font-size: 0.6rem; color: var(--chrome); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px;" id="projMonth3Label">--</div>
+                        <div class="stat-value" style="font-size: 1.1rem; color: var(--mustang-red);" id="projMonth3">$--</div>
+                        <div class="stat-label">Estimado</div>
+                    </div>
+                </div>
+                <div style="margin-top: 14px; padding: 12px; background: rgba(245,166,35,0.08); border-radius: 8px; border: 1px solid rgba(245,166,35,0.2); font-size: 0.78rem; color: var(--amber);">
+                    ⚠️ La proyección se basa en tu promedio mensual de gasto. Cuantos más registros tengas, más precisa será.
+                </div>
+            </div>
+        </section>
+
+        <!-- Settings Section -->
+        <section id="settings" class="section">
+            <div class="card">
+                <h2>⚙️ CONFIGURACIÓN DEL VEHÍCULO</h2>
+                <form id="vehicleForm">
+                    <div class="dashboard-grid">
+                        <div class="form-group">
+                            <label>Marca</label>
+                            <input type="text" id="vehicleMake" value="Ford">
+                        </div>
+                        <div class="form-group">
+                            <label>Modelo</label>
+                            <input type="text" id="vehicleModel" value="Mustang">
+                        </div>
+                        <div class="form-group">
+                            <label>Año</label>
+                            <input type="number" id="vehicleYear" value="1967">
+                        </div>
+                        <div class="form-group">
+                            <label>Color</label>
+                            <input type="text" id="vehicleColor" placeholder="Ej: Rojo Candy Apple">
+                        </div>
+                        <div class="form-group">
+                            <label>Capacidad tanque (L)</label>
+                            <input type="number" id="tankCapacity" step="0.1" value="60" placeholder="Ej: 60">
+                        </div>
+                        <div class="form-group">
+                            <label>Odómetro actual (km)</label>
+                            <input type="number" id="currentOdometer" value="0">
+                        </div>
+                    </div>
+                    <button type="submit" class="btn">Guardar Configuración</button>
+                </form>
+            </div>
+
+            <div class="card" style="margin-top: 20px;">
+                <h2>💾 GESTIÓN DE DATOS</h2>
+                <div style="display: flex; flex-direction: column; gap: 10px;">
+                    <button class="btn btn-secondary" onclick="exportData()">📤 Exportar Datos (JSON)</button>
+                    <button class="btn btn-secondary" onclick="document.getElementById('importFile').click()">📥 Importar Datos</button>
+                    <input type="file" id="importFile" accept=".json" style="display: none;" onchange="importData(event)">
+                    <button class="btn" style="background: var(--mustang-dark);" onclick="clearAllData()">⚠️ Borrar Todos los Datos</button>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Fuel Modal for Quick Add -->
+    <div class="modal" id="fuelModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>⛽ Registrar Gasolina</h2>
+                <button class="modal-close" onclick="closeModal('fuelModal')">&times;</button>
+            </div>
+            <form id="quickFuelForm">
+                <div class="form-group">
+                    <label>Fecha</label>
+                    <input type="date" id="quickFuelDate" required>
+                </div>
+                <div class="form-group">
+                    <label>Odómetro (km)</label>
+                    <input type="number" id="quickFuelOdometer" required>
+                </div>
+                <div class="form-group">
+                    <label>Litros cargados</label>
+                    <input type="number" id="quickFuelLiters" step="0.01" required>
+                </div>
+                <div class="form-group">
+                    <label>Precio por litro ($)</label>
+                    <input type="number" id="quickFuelPrice" step="0.01" required>
+                </div>
+                <div class="form-group">
+                    <label>Litros previos (opcional)</label>
+                    <input type="number" id="quickFuelBefore" step="0.1" min="0" placeholder="¿Cuántos L había antes?">
+                    <div style="margin-top:4px; font-size:0.7rem; color:var(--chrome);">Mejora el cálculo de autonomía 🎯</div>
+                </div>
+                <div class="form-group">
+                    <label>¿Tanque lleno?</label>
+                    <select id="quickFuelFull">
+                        <option value="true">Sí - Tanque completo</option>
+                        <option value="false">No - Parcial / Top-up</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Estación</label>
+                    <input type="text" id="quickFuelStation">
+                </div>
+                <button type="submit" class="btn">Guardar</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Maintenance Modal for Quick Add -->
+    <div class="modal" id="maintenanceModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>🔧 Registrar Mantenimiento</h2>
+                <button class="modal-close" onclick="closeModal('maintenanceModal')">&times;</button>
+            </div>
+            <form id="quickMaintForm">
+                <div class="form-group">
+                    <label>Fecha</label>
+                    <input type="date" id="quickMaintDate" required>
+                </div>
+                <div class="form-group">
+                    <label>Categoría</label>
+                    <select id="quickMaintCategory" required onchange="updateQuickMaintItems()">
+                        <option value="">Seleccionar...</option>
+                        <option value="engine">Motor</option>
+                        <option value="oil">Aceite</option>
+                        <option value="suspension">Suspensión</option>
+                        <option value="brakes">Frenos</option>
+                        <option value="tires">Neumáticos</option>
+                        <option value="cooling">Refrigeración</option>
+                        <option value="transmission">Transmisión</option>
+                        <option value="electrical">Eléctrico</option>
+                        <option value="custom">Personalizado</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Ítem</label>
+                    <select id="quickMaintItem" required>
+                        <option value="">Primero selecciona categoría</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Próximo cambio (km)</label>
+                    <input type="number" id="quickMaintNextKm">
+                </div>
+                <button type="submit" class="btn">Guardar</button>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        // ============================================
+        // DATA STRUCTURES & INITIALIZATION
+        // ============================================
+
+        const maintenanceItems = {
+            engine: ['Bujías', 'Filtro de aire', 'Correa de distribución', 'Válvulas', 'Múltiple', 'Carburador'],
+            oil: ['Cambio de aceite', 'Filtro de aceite', 'Limpieza de cárter'],
+            suspension: ['Amortiguadores delanteros', 'Amortiguadores traseros', 'Bujes', 'Barras estabilizadoras', 'Dirección'],
+            brakes: ['Pastillas delanteras', 'Pastillas traseras', 'Discos', 'Tambor', 'Líquido de frenos', 'Cilindro maestro'],
+            tires: ['Rotación', 'Alineación', 'Balanceo', 'Reemplazo', 'Reparación pinchazo'],
+            cooling: ['Radiador', 'Mangueras', 'Termostato', 'Bomba de agua', 'Refrigerante'],
+            transmission: ['Fluido transmisión', 'Embrague', 'Placa de presión', 'Retenes'],
+            electrical: ['Batería', 'Alternador', 'Marcha', 'Distribuidor', 'Bobina', 'Fusibles'],
+            custom: []
+        };
+
+        let appData = {
+            vehicle: {
+                make: 'Ford',
+                model: 'Mustang',
+                year: 1967,
+                color: '',
+                tankCapacity: 60, // 16 galones = ~60L
+                currentOdometer: 84555,
+                reserveThreshold: 10, // Cuando queden 10L, avisar
+                defaultEfficiency: 7.3 // km/L estimado para 302 V8
+            },
+            fuelRecords: [
+                {
+                    date: '2026-04-21',
+                    odometer: 84089,
+                    liters: 20,
+                    price: 0.50,
+                    station: '',
+                    grade: 'regular',
+                    full: true
+                },
+                {
+                    date: '2026-04-23',
+                    odometer: 84167,
+                    liters: 5,
+                    price: 1.00,
+                    station: '',
+                    grade: 'regular',
+                    full: false
+                },
+                {
+                    date: '2026-04-29',
+                    odometer: 84336,
+                    liters: 10,
+                    price: 0,
+                    station: 'Bidón de emergencia',
+                    grade: 'regular',
+                    full: false,
+                    tripNotes: '🚨 Sin gasolina en ruta. Bidón 10L. Rodó 10km hasta casa. ~8.6L restantes estimados.'
+                },
+                {
+                    date: '2026-04-29',
+                    odometer: 84346,
+                    liters: 20,
+                    price: 0.50,
+                    station: '',
+                    grade: 'regular',
+                    full: false,
+                    fuelBefore: 5,
+                    tripNotes: 'Había ~5L en el tanque antes de cargar'
+                },
+                {
+                    date: '2026-05-01',
+                    odometer: 84490,
+                    liters: 10,
+                    price: 0,
+                    station: 'Bidón de emergencia',
+                    grade: 'regular',
+                    full: false,
+                    fuelBefore: 0,
+                    tripNotes: '🚨 Se quedó sin gasolina en 84490 km. Echó 10L del bidón (gratis).'
+                },
+                {
+                    date: '2026-05-01',
+                    odometer: 84496,
+                    liters: 20,
+                    price: 0.50,
+                    station: '',
+                    grade: 'regular',
+                    full: false,
+                    tripNotes: 'Recarga 20L por $10 después de bidón de emergencia'
+                }
+            ],
+            maintenanceRecords: [
+                {
+                    date: '2026-04-25',
+                    odometer: 83525,
+                    category: 'oil',
+                    item: 'Cambio de aceite',
+                    cost: 0,
+                    nextKm: 5000,
+                    notes: 'Cambio de aceite inicial registrado',
+                    nextOdometer: 88525
+                },
+                {
+                    date: '2026-05-01',
+                    odometer: 84520,
+                    category: 'suspension',
+                    item: 'Amortiguadores traseros',
+                    cost: 25,
+                    nextKm: null,
+                    notes: 'Se colocó el amortiguador trasero derecho que faltaba. Incluye pieza e instalación.'
+                },
+                {
+                    date: '2026-05-01',
+                    odometer: 84520,
+                    category: 'custom',
+                    item: 'Lavado de carro',
+                    cost: 5,
+                    nextKm: null,
+                    notes: 'Lavado completo del vehículo'
+                }
+            ]
+        };
+
+        // ============================================
+        // LOCAL STORAGE FUNCTIONS
+        // ============================================
+
+        function load_data() {
+            const saved = localStorage.getItem('mustang67Data');
+            if (saved) {
+                appData = JSON.parse(saved);
+            }
+            populateVehicleForm();
+            updateDashboard();
+            updateFuelTable();
+            updateMaintenanceGrid();
+            updateMaintenanceTable();
+            try { updateCharts(); } catch(e) { /* Chart.js not ready yet, will retry on window.onload */ }
+            updateStats();
+        }
+
+        function save_data() {
+            localStorage.setItem('mustang67Data', JSON.stringify(appData));
+            updateDashboard();
+        }
+
+        // ============================================
+        // NAVIGATION
+        // ============================================
+
+        document.querySelectorAll('.nav-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+                document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+
+                btn.classList.add('active');
+                document.getElementById(btn.dataset.section).classList.add('active');
+
+                if (btn.dataset.section === 'stats') {
+                    setTimeout(updateCharts, 100);
+                }
+                if (btn.dataset.section === 'mapview') {
+                    setTimeout(initMap, 150);
+                }
+            });
+        });
+
+        // ============================================
+        // VEHICLE SETTINGS
+        // ============================================
+
+        function populateVehicleForm() {
+            document.getElementById('vehicleMake').value = appData.vehicle.make;
+            document.getElementById('vehicleModel').value = appData.vehicle.model;
+            document.getElementById('vehicleYear').value = appData.vehicle.year;
+            document.getElementById('vehicleColor').value = appData.vehicle.color;
+            document.getElementById('tankCapacity').value = appData.vehicle.tankCapacity;
+            document.getElementById('currentOdometer').value = appData.vehicle.currentOdometer;
+        }
+
+        document.getElementById('vehicleForm').addEventListener('submit', (e) => {
+            e.preventDefault();
+            appData.vehicle = {
+                make: document.getElementById('vehicleMake').value,
+                model: document.getElementById('vehicleModel').value,
+                year: parseInt(document.getElementById('vehicleYear').value),
+                color: document.getElementById('vehicleColor').value,
+                tankCapacity: parseFloat(document.getElementById('tankCapacity').value),
+                currentOdometer: parseInt(document.getElementById('currentOdometer').value)
+            };
+            save_data();
+            alert('¡Configuración guardada!');
+        });
+
+        // ============================================
+        // FUEL MANAGEMENT
+        // ============================================
+
+        // ============================================
+        // GEOLOCATION & MAP
+        // ============================================
+
+        let mapInstance = null;
+
+        function captureLocation() {
+            const btn = document.getElementById('geoBtn');
+            const addressDiv = document.getElementById('geoAddress');
+            btn.textContent = '⏳ Obteniendo ubicación...';
+            btn.className = 'geo-btn';
+
+            if (!navigator.geolocation) {
+                btn.textContent = '❌ GPS no disponible en este navegador';
+                btn.className = 'geo-btn error';
+                return;
+            }
+
+            navigator.geolocation.getCurrentPosition(
+                async (pos) => {
+                    const lat = pos.coords.latitude.toFixed(6);
+                    const lng = pos.coords.longitude.toFixed(6);
+                    document.getElementById('fuelLat').value = lat;
+                    document.getElementById('fuelLng').value = lng;
+                    btn.textContent = `✓ ${lat}, ${lng}`;
+                    btn.className = 'geo-btn success';
+
+                    // Reverse geocoding via Nominatim (free, no API key)
+                    try {
+                        const res = await fetch(
+                            `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`,
+                            { headers: { 'Accept-Language': 'es' } }
+                        );
+                        const data = await res.json();
+                        const addr = data.address;
+                        const road = addr.road || addr.pedestrian || addr.suburb || '';
+                        const city = addr.city || addr.town || addr.village || '';
+                        const display = [road, city].filter(Boolean).join(', ');
+                        addressDiv.textContent = '📍 ' + (display || data.display_name.split(',').slice(0,2).join(','));
+                        // Pre-fill station field if empty
+                        const stationField = document.getElementById('fuelStation');
+                        if (!stationField.value) stationField.value = display;
+                    } catch(e) {
+                        addressDiv.textContent = `📍 ${lat}, ${lng}`;
+                    }
+                },
+                (err) => {
+                    btn.textContent = '❌ No se pudo obtener el GPS';
+                    btn.className = 'geo-btn error';
+                    addressDiv.textContent = 'Asegúrate de dar permiso de ubicación al navegador.';
+                },
+                { enableHighAccuracy: true, timeout: 10000 }
+            );
+        }
+
+        // Price vs average indicator
+        document.getElementById('fuelPrice').addEventListener('input', function() {
+            const val = parseFloat(this.value);
+            const indicator = document.getElementById('priceIndicator');
+            if (!val || appData.fuelRecords.length < 2) { indicator.innerHTML = ''; return; }
+            const pricesWithValue = appData.fuelRecords.filter(r => r.price > 0);
+            if (pricesWithValue.length === 0) { indicator.innerHTML = ''; return; }
+            const avg = pricesWithValue.reduce((s, r) => s + r.price, 0) / pricesWithValue.length;
+            const diff = ((val - avg) / avg * 100).toFixed(1);
+            if (val <= avg * 0.98) {
+                indicator.innerHTML = `<span class="price-indicator price-good">✓ ${diff}% bajo tu promedio ($${avg.toFixed(2)}/L)</span>`;
+            } else if (val >= avg * 1.02) {
+                indicator.innerHTML = `<span class="price-indicator price-bad">↑ ${diff}% sobre tu promedio ($${avg.toFixed(2)}/L)</span>`;
+            } else {
+                indicator.innerHTML = `<span class="price-indicator price-avg">≈ Precio promedio ($${avg.toFixed(2)}/L)</span>`;
+            }
+        });
+
+        function initMap() {
+            const container = document.getElementById('stationsMap');
+            if (!container) return;
+
+            const geoStops = appData.fuelRecords.filter(r => r.lat && r.lng);
+
+            // Update stats
+            document.getElementById('mapTotalStops').textContent = geoStops.length;
+            const pricesArr = geoStops.filter(r => r.price > 0).map(r => r.price);
+            document.getElementById('mapAvgPrice').textContent =
+                pricesArr.length ? '$' + (pricesArr.reduce((a,b)=>a+b,0)/pricesArr.length).toFixed(2) : '--';
+            document.getElementById('mapBestPrice').textContent =
+                pricesArr.length ? '$' + Math.min(...pricesArr).toFixed(2) : '--';
+
+            if (!mapInstance) {
+                const center = geoStops.length
+                    ? [parseFloat(geoStops[geoStops.length-1].lat), parseFloat(geoStops[geoStops.length-1].lng)]
+                    : [18.4861, -69.9312]; // Default: Santo Domingo
+
+                mapInstance = L.map('stationsMap').setView(center, geoStops.length ? 13 : 5);
+
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    attribution: '© <a href="https://openstreetmap.org">OpenStreetMap</a>',
+                    maxZoom: 19
+                }).addTo(mapInstance);
+            }
+
+            // Clear existing markers
+            mapInstance.eachLayer(layer => {
+                if (layer instanceof L.Marker) mapInstance.removeLayer(layer);
+            });
+
+            const gradeColors = { regular: '#29b6f6', plus: '#f5a623', premium: '#c41e3a', diesel: '#69f0ae' };
+
+            geoStops.forEach((record, i) => {
+                const color = gradeColors[record.grade] || '#c41e3a';
+                const icon = L.divIcon({
+                    className: '',
+                    html: `<div style="width:32px;height:32px;border-radius:50% 50% 50% 0;background:${color};border:2px solid #fff;transform:rotate(-45deg);box-shadow:0 2px 8px rgba(0,0,0,0.5);"><div style="transform:rotate(45deg);text-align:center;line-height:28px;font-size:14px;">⛽</div></div>`,
+                    iconSize: [32, 32],
+                    iconAnchor: [16, 32]
+                });
+
+                const total = (record.liters * record.price).toFixed(2);
+                const popup = `
+                    <div style="padding:4px;min-width:180px;">
+                        <strong style="font-family:'Orbitron',sans-serif;font-size:0.7rem;color:${color};">${record.grade ? record.grade.toUpperCase() : 'GASOLINA'}</strong><br>
+                        <span style="color:#a8a8b3;font-size:0.75rem;">${formatDate(record.date)}</span><br>
+                        <hr style="border-color:rgba(255,255,255,0.1);margin:6px 0;">
+                        <b>${record.station || 'Estación sin nombre'}</b><br>
+                        <span style="font-size:0.82rem;">⛽ ${record.liters.toFixed(1)}L &nbsp;|&nbsp; $${record.price.toFixed(2)}/L</span><br>
+                        <span style="font-size:0.82rem;">💵 Total: $${total}</span><br>
+                        ${record.tripNotes ? `<span style="font-size:0.78rem;color:#a8a8b3;">📝 ${record.tripNotes}</span>` : ''}
+                    </div>`;
+
+                L.marker([parseFloat(record.lat), parseFloat(record.lng)], { icon })
+                    .bindPopup(popup)
+                    .addTo(mapInstance);
+            });
+
+            if (geoStops.length > 1) {
+                const bounds = geoStops.map(r => [parseFloat(r.lat), parseFloat(r.lng)]);
+                mapInstance.fitBounds(bounds, { padding: [40, 40] });
+            }
+
+            updateMapStopsTable(geoStops);
+        }
+
+        function updateMapStopsTable(geoStops) {
+            const tbody = document.querySelector('#mapStopsTable tbody');
+            if (!tbody) return;
+            tbody.innerHTML = '';
+            const gradeLabels = { regular: 'Regular 87', plus: 'Plus 89', premium: 'Premium 91+', diesel: 'Diesel' };
+            const gradeColors = { regular: 'badge-fuel', plus: 'badge-oil', premium: 'badge-brakes', diesel: 'badge-tires' };
+            [...geoStops].reverse().forEach(r => {
+                const row = tbody.insertRow();
+                row.innerHTML = `
+                    <td>${formatDate(r.date)}</td>
+                    <td>${r.station || '-'}</td>
+                    <td><span class="badge ${gradeColors[r.grade] || 'badge-custom'}">${gradeLabels[r.grade] || r.grade || '-'}</span></td>
+                    <td>$${r.price.toFixed(2)}</td>
+                    <td>${r.liters.toFixed(1)}L</td>
+                    <td>$${(r.liters * r.price).toFixed(2)}</td>
+                    <td style="color:var(--chrome);font-size:0.8rem;">${r.tripNotes || '-'}</td>
+                `;
+            });
+        }
+
+        document.getElementById('fuelForm').addEventListener('submit', (e) => {
+            e.preventDefault();
+            const lat = document.getElementById('fuelLat').value;
+            const lng = document.getElementById('fuelLng').value;
+            const fuelBeforeRaw = document.getElementById('fuelBefore').value;
+            addFuelRecord({
+                date: document.getElementById('fuelDate').value,
+                odometer: parseInt(document.getElementById('fuelOdometer').value),
+                liters: parseFloat(document.getElementById('fuelLiters').value),
+                price: parseFloat(document.getElementById('fuelPrice').value),
+                grade: document.getElementById('fuelGrade').value,
+                station: document.getElementById('fuelStation').value,
+                tripNotes: document.getElementById('fuelTripNotes').value,
+                full: document.getElementById('fuelFull').value === 'true',
+                fuelBefore: fuelBeforeRaw !== '' ? parseFloat(fuelBeforeRaw) : undefined,
+                lat: lat || null,
+                lng: lng || null
+            });
+            e.target.reset();
+            document.getElementById('fuelDate').value = new Date().toISOString().split('T')[0];
+            document.getElementById('geoBtn').textContent = '📍 Capturar ubicación actual';
+            document.getElementById('geoBtn').className = 'geo-btn';
+            document.getElementById('geoAddress').textContent = '';
+        });
+
+        document.getElementById('quickFuelForm').addEventListener('submit', (e) => {
+            e.preventDefault();
+            const quickFuelBeforeRaw = document.getElementById('quickFuelBefore').value;
+            addFuelRecord({
+                date: document.getElementById('quickFuelDate').value,
+                odometer: parseInt(document.getElementById('quickFuelOdometer').value),
+                liters: parseFloat(document.getElementById('quickFuelLiters').value),
+                price: parseFloat(document.getElementById('quickFuelPrice').value),
+                station: document.getElementById('quickFuelStation').value,
+                fuelBefore: quickFuelBeforeRaw !== '' ? parseFloat(quickFuelBeforeRaw) : undefined,
+                full: document.getElementById('quickFuelFull').value === 'true'
+            });
+            closeModal('fuelModal');
+            e.target.reset();
+            document.getElementById('quickFuelDate').value = new Date().toISOString().split('T')[0];
+        });
+
+        function addFuelRecord(record) {
+            appData.fuelRecords.push(record);
+            appData.fuelRecords.sort((a, b) => a.odometer - b.odometer);
+            appData.vehicle.currentOdometer = record.odometer;
+            save_data();
+            alert('¡Registro de combustible guardado!');
+        }
+
+        function updateFuelTable() {
+            const tbody = document.querySelector('#fuelHistoryTable tbody');
+            tbody.innerHTML = '';
+            const gradeLabels = { regular: '87', plus: '89', premium: '91+', diesel: 'DSL' };
+            const gradeColors = { regular: 'badge-fuel', plus: 'badge-oil', premium: 'badge-brakes', diesel: 'badge-tires' };
+
+            [...appData.fuelRecords].reverse().forEach((record, index) => {
+                const prevRecord = appData.fuelRecords[index];
+                const kmPerLiter = prevRecord ?
+                    ((record.odometer - (prevRecord.odometer || 0)) / record.liters).toFixed(1) : '--';
+
+                const row = tbody.insertRow();
+                row.innerHTML = `
+                    <td><span class="badge ${gradeColors[record.grade] || 'badge-custom'}">${gradeLabels[record.grade] || record.grade || '⛽'}</span></td>
+                    <td>${formatDate(record.date)}</td>
+                    <td>${record.odometer.toLocaleString()}</td>
+                    <td>${record.liters.toFixed(2)}</td>
+                    <td>$${record.price.toFixed(2)}</td>
+                    <td>$${(record.liters * record.price).toFixed(2)}</td>
+                    <td>${record.station || '-'}</td>
+                    <td style="color: ${parseFloat(kmPerLiter) > 8 ? 'var(--green)' : 'var(--amber)'}">${kmPerLiter}</td>
+                `;
+            });
+        }
+
+        // ============================================
+        // MAINTENANCE MANAGEMENT
+        // ============================================
+
+        function updateMaintItems() {
+            const category = document.getElementById('maintCategory').value;
+            const itemSelect = document.getElementById('maintItem');
+            itemSelect.innerHTML = '';
+
+            if (category && maintenanceItems[category]) {
+                maintenanceItems[category].forEach(item => {
+                    itemSelect.innerHTML += `<option value="${item}">${item}</option>`;
+                });
+            } else {
+                itemSelect.innerHTML = '<option value="">Primero selecciona categoría</option>';
+            }
+        }
+
+        function updateQuickMaintItems() {
+            const category = document.getElementById('quickMaintCategory').value;
+            const itemSelect = document.getElementById('quickMaintItem');
+            itemSelect.innerHTML = '';
+
+            if (category && maintenanceItems[category]) {
+                maintenanceItems[category].forEach(item => {
+                    itemSelect.innerHTML += `<option value="${item}">${item}</option>`;
+                });
+            } else {
+                itemSelect.innerHTML = '<option value="">Primero selecciona categoría</option>';
+            }
+        }
+
+        document.getElementById('maintenanceForm').addEventListener('submit', (e) => {
+            e.preventDefault();
+            addMaintenanceRecord({
+                date: document.getElementById('maintDate').value,
+                odometer: parseInt(document.getElementById('maintOdometer').value),
+                category: document.getElementById('maintCategory').value,
+                item: document.getElementById('maintItem').value,
+                cost: parseFloat(document.getElementById('maintCost').value) || 0,
+                nextKm: parseInt(document.getElementById('maintNextKm').value) || null,
+                notes: document.getElementById('maintNotes').value,
+                nextOdometer: document.getElementById('maintOdometer').value + (parseInt(document.getElementById('maintNextKm').value) || 0)
+            });
+            e.target.reset();
+            document.getElementById('maintDate').value = new Date().toISOString().split('T')[0];
+        });
+
+        document.getElementById('quickMaintForm').addEventListener('submit', (e) => {
+            e.preventDefault();
+            const currentKm = appData.vehicle.currentOdometer;
+            addMaintenanceRecord({
+                date: document.getElementById('quickMaintDate').value,
+                odometer: currentKm,
+                category: document.getElementById('quickMaintCategory').value,
+                item: document.getElementById('quickMaintItem').value,
+                cost: 0,
+                nextKm: parseInt(document.getElementById('quickMaintNextKm').value) || 5000,
+                notes: '',
+                nextOdometer: currentKm + (parseInt(document.getElementById('quickMaintNextKm').value) || 5000)
+            });
+            closeModal('maintenanceModal');
+            e.target.reset();
+            document.getElementById('quickMaintDate').value = new Date().toISOString().split('T')[0];
+        });
+
+        function addMaintenanceRecord(record) {
+            appData.maintenanceRecords.push(record);
+            appData.maintenanceRecords.sort((a, b) => new Date(b.date) - new Date(a.date));
+            save_data();
+            alert('¡Mantenimiento registrado!');
+        }
+
+        function updateMaintenanceGrid() {
+            const grid = document.getElementById('maintenanceGrid');
+            const currentKm = appData.vehicle.currentOdometer;
+
+            // Group by item and get latest
+            const latestMaint = new Map();
+            appData.maintenanceRecords.forEach(record => {
+                const key = `${record.category}-${record.item}`;
+                if (!latestMaint.has(key) || new Date(record.date) > new Date(latestMaint.get(key).date)) {
+                    latestMaint.set(key, record);
+                }
+            });
+
+            if (latestMaint.size === 0) {
+                grid.innerHTML = '<p style="text-align: center; color: var(--chrome-light); grid-column: 1/-1;">No hay registros de mantenimiento</p>';
+                return;
+            }
+
+            grid.innerHTML = '';
+            latestMaint.forEach(record => {
+                const kmRemaining = record.nextOdometer - currentKm;
+                const percentage = Math.max(0, Math.min(100, (kmRemaining / (record.nextKm || 5000)) * 100));
+
+                let statusClass = 'ok';
+                let statusText = 'OK';
+                if (kmRemaining <= 0) {
+                    statusClass = 'overdue';
+                    statusText = 'VENCIDO';
+                } else if (kmRemaining < 500) {
+                    statusClass = 'due-soon';
+                    statusText = 'PRONTO';
+                }
+
+                const categoryLabels = {
+                    engine: 'Motor', oil: 'Aceite', suspension: 'Suspensión',
+                    brakes: 'Frenos', tires: 'Neumáticos', cooling: 'Refrigeración',
+                    transmission: 'Transmisión', electrical: 'Eléctrico', custom: 'Custom'
+                };
+
+                grid.innerHTML += `
+                    <div class="maintenance-item ${statusClass}">
+                        <div class="maintenance-item-header">
+                            <span class="maintenance-item-title">${record.item}</span>
+                            <span class="maintenance-item-status status-${statusClass}">${statusText}</span>
+                        </div>
+                        <div class="maintenance-item-details">
+                            <span class="badge badge-${record.category}">${categoryLabels[record.category] || record.category}</span>
+                            <br><br>
+                            Último: ${formatDate(record.date)} a ${record.odometer.toLocaleString()} km<br>
+                            Próximo: ${kmRemaining > 0 ? `en ${kmRemaining.toLocaleString()} km` : `Vencido hace ${Math.abs(kmRemaining).toLocaleString()} km`}
+                        </div>
+                        <div class="maintenance-item-bar">
+                            <div class="maintenance-item-bar-fill" style="width: ${percentage}%"></div>
+                        </div>
+                    </div>
+                `;
+            });
+        }
+
+        function updateMaintenanceTable() {
+            const tbody = document.querySelector('#maintHistoryTable tbody');
+            tbody.innerHTML = '';
+
+            const categoryLabels = {
+                engine: 'Motor', oil: 'Aceite', suspension: 'Suspensión',
+                brakes: 'Frenos', tires: 'Neumáticos', cooling: 'Refrigeración',
+                transmission: 'Transmisión', electrical: 'Eléctrico', custom: 'Custom'
+            };
+
+            appData.maintenanceRecords.forEach(record => {
+                const row = tbody.insertRow();
+                row.innerHTML = `
+                    <td>${formatDate(record.date)}</td>
+                    <td>${record.odometer.toLocaleString()}</td>
+                    <td><span class="badge badge-${record.category}">${categoryLabels[record.category] || record.category}</span></td>
+                    <td>${record.item}</td>
+                    <td>$${record.cost.toFixed(2)}</td>
+                    <td>${record.nextOdometer ? record.nextOdometer.toLocaleString() + ' km' : '-'}</td>
+                    <td>${record.notes || '-'}</td>
+                `;
+            });
+        }
+
+        // ============================================
+        // DASHBOARD
+        // ============================================
+
+        function updateDashboard() {
+            const currentKm = appData.vehicle.currentOdometer;
+            const tankCapacity = appData.vehicle.tankCapacity;
+            const defaultEff = appData.vehicle.defaultEfficiency || 7.3;
+
+            // Calculate fuel level based on actual fuel records
+            let fuelLevel = 0;
+            let efficiency = defaultEff;
+            let range = 0;
+            let fuelRemaining = 0;
+
+            if (appData.fuelRecords.length >= 1) {
+                // Sort records by odometer
+                const sorted = [...appData.fuelRecords].sort((a, b) => a.odometer - b.odometer);
+
+                // Calculate efficiency from full-tank records only
+                let fullTankRecords = sorted.filter(r => r.full === true);
+                if (fullTankRecords.length >= 2) {
+                    let totalKm = 0;
+                    let totalLiters = 0;
+                    for (let i = 1; i < fullTankRecords.length; i++) {
+                        const kmDriven = fullTankRecords[i].odometer - fullTankRecords[i-1].odometer;
+                        if (kmDriven > 0) {
+                            totalKm += kmDriven;
+                            totalLiters += fullTankRecords[i].liters;
+                        }
+                    }
+                    if (totalKm > 0 && totalLiters > 0) {
+                        efficiency = totalKm / totalLiters;
+                    }
+                }
+
+                // ── Find last known tank-state checkpoint ───────────────────────────
+                // A checkpoint is either:
+                //   (a) a full-tank fill-up  →  tank = tankCapacity after filling
+                //   (b) an emergency "ran out" fill  →  tank resets to 0, then add liters
+                //       We detect this when the record's notes contain '🚨' or station
+                //       contains 'Bidón' OR the record is explicitly marked as an emergency.
+                //
+                // Strategy: walk records in reverse; find the LAST full-tank fill-up.
+                // Then accumulate all partial top-ups AFTER that checkpoint.
+                // If there is a "ran-out" event after the last full tank, start from there.
+
+                let checkpointIdx = -1;
+                let checkpointFuelInTank = 0;
+
+                // Scan backwards for the most recent definitive checkpoint
+                for (let i = sorted.length - 1; i >= 0; i--) {
+                    const r = sorted[i];
+
+                    if (typeof r.fuelBefore === 'number' && r.fuelBefore >= 0) {
+                        // Best checkpoint: user explicitly told us how much was in the tank before filling
+                        checkpointIdx = i;
+                        checkpointFuelInTank = r.fuelBefore + r.liters;
+                        break;
+                    }
+
+                    const isRanOut = (r.tripNotes && r.tripNotes.includes('🚨')) ||
+                                     (r.station && r.station.toLowerCase().includes('bidón')) ||
+                                     (r.station && r.station.toLowerCase().includes('bidon')) ||
+                                     r.emergency === true;
+
+                    if (isRanOut) {
+                        // Tank was at 0 when this happened; fuel in tank = just what was added
+                        checkpointIdx = i;
+                        checkpointFuelInTank = r.liters;
+                        break;
+                    }
+                    if (r.full === true) {
+                        // Full tank fill-up: assume tank = tankCapacity after filling
+                        checkpointIdx = i;
+                        checkpointFuelInTank = tankCapacity;
+                        break;
+                    }
+                }
+
+                if (checkpointIdx === -1) {
+                    // No clear checkpoint — fallback: use first record as baseline
+                    checkpointIdx = 0;
+                    checkpointFuelInTank = sorted[0].liters;
+                }
+
+                // Add any top-ups that happened AFTER the checkpoint
+                let fuelAfterCheckpoint = checkpointFuelInTank;
+                for (let i = checkpointIdx + 1; i < sorted.length; i++) {
+                    fuelAfterCheckpoint += sorted[i].liters;
+                }
+
+                // Subtract fuel consumed since the checkpoint odometer
+                const checkpointOdometer = sorted[checkpointIdx].odometer;
+                const kmSinceCheckpoint = currentKm - checkpointOdometer;
+                const litersConsumedSinceCheckpoint = kmSinceCheckpoint / efficiency;
+
+                fuelRemaining = Math.max(0, fuelAfterCheckpoint - litersConsumedSinceCheckpoint);
+
+                // Calculate fuel level percentage
+                fuelLevel = (fuelRemaining / tankCapacity) * 100;
+                fuelLevel = Math.max(0, Math.min(100, fuelLevel));
+                range = fuelRemaining * efficiency;
+            }
+
+            // Update gauge
+            const gaugeFill = document.getElementById('fuelGaugeFill');
+            const needle = document.getElementById('fuelNeedle');
+            const circumference = 440;
+            const offset = circumference - (fuelLevel / 100) * circumference;
+            gaugeFill.style.strokeDashoffset = offset;
+            needle.style.transform = `rotate(${-90 + (fuelLevel / 100) * 180}deg)`;
+
+            document.getElementById('fuelDigital').textContent = `${fuelRemaining.toFixed(1)} L`;
+            document.getElementById('dashRange').textContent = `${Math.round(range)} km`;
+            document.getElementById('dashEfficiency').textContent = `${efficiency.toFixed(1)} km/L`;
+
+            // Alerta de reserva
+            const reserveEl = document.getElementById('fuelReserveAlert');
+            if (reserveEl) {
+                if (fuelRemaining <= appData.vehicle.reserveThreshold) {
+                    reserveEl.textContent = `⚠️ ¡RESERVA! Quedan ${fuelRemaining.toFixed(1)}L - Echa gasolina pronto`;
+                    reserveEl.style.color = 'var(--mustang-red)';
+                    reserveEl.classList.add('pulse');
+                } else if (fuelRemaining <= 20) {
+                    reserveEl.textContent = `⏰ Próximo tanque: ${Math.round(range)} km restantes`;
+                    reserveEl.style.color = 'var(--amber)';
+                    reserveEl.classList.remove('pulse');
+                } else {
+                    reserveEl.textContent = `✓ Tanque: ${Math.round(range)} km de autonomía`;
+                    reserveEl.style.color = 'var(--green)';
+                    reserveEl.classList.remove('pulse');
+                }
+            }
+
+            // Guardar eficiencia calculada para usar en otros lugares
+            appData.currentEfficiency = efficiency;
+            appData.fuelRemaining = fuelRemaining;
+
+            // Monthly stats — compare YYYY-MM strings to avoid UTC-vs-local timezone bug
+            const now = new Date();
+            const currentYearMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+
+            const monthFuel = appData.fuelRecords.filter(r => r.date && r.date.startsWith(currentYearMonth));
+            const monthLiters = monthFuel.reduce((sum, r) => sum + r.liters, 0);
+            const monthSpent = monthFuel.reduce((sum, r) => sum + (r.liters * r.price), 0);
+            const monthKm = monthFuel.length > 0 ?
+                monthFuel[monthFuel.length - 1].odometer - (monthFuel[0].odometer || 0) : 0;
+
+            document.getElementById('monthFuel').textContent = `${monthLiters.toFixed(0)} L`;
+            document.getElementById('monthSpent').textContent = `$${monthSpent.toFixed(0)}`;
+            document.getElementById('totalKm').textContent = `${monthKm.toLocaleString()} km`;
+            document.getElementById('avgEfficiency').textContent = efficiency > 0 ? `${efficiency.toFixed(1)} km/L` : '-- km/L';
+
+            // Next maintenance
+            updateNextMaintenance();
+        }
+
+        function updateNextMaintenance() {
+            const currentKm = appData.vehicle.currentOdometer;
+            const container = document.getElementById('nextMaintenanceList');
+
+            const latestMaint = new Map();
+            appData.maintenanceRecords.forEach(record => {
+                const key = `${record.category}-${record.item}`;
+                if (!latestMaint.has(key) || new Date(record.date) > new Date(latestMaint.get(key).date)) {
+                    latestMaint.set(key, record);
+                }
+            });
+
+            const dueSoon = [];
+            latestMaint.forEach(record => {
+                const kmRemaining = record.nextOdometer - currentKm;
+                if (kmRemaining <= 1000) {
+                    dueSoon.push({ ...record, kmRemaining });
+                }
+            });
+
+            dueSoon.sort((a, b) => a.kmRemaining - b.kmRemaining);
+
+            if (dueSoon.length === 0) {
+                container.innerHTML = '<p style="text-align: center; color: var(--green);">✓ Todo en orden</p>';
+            } else {
+                container.innerHTML = dueSoon.slice(0, 5).map(item => `
+                    <div style="padding: 10px; margin: 5px 0; background: ${item.kmRemaining <= 0 ? 'var(--mustang-dark)' : 'var(--dark-gray)'}; border-radius: 5px; border-left: 3px solid ${item.kmRemaining <= 0 ? 'var(--mustang-red)' : 'var(--amber)'};">
+                        <strong>${item.item}</strong><br>
+                        <small style="color: var(--chrome-light);">${item.kmRemaining <= 0 ? '⚠️ VENCIDO' : '⏰'} ${Math.abs(item.kmRemaining)} km</small>
+                    </div>
+                `).join('');
+            }
+        }
+
+        // ============================================
+        // STATISTICS & CHARTS
+        // ============================================
+
+        let efficiencyChartInstance = null;
+        let expensesChartInstance = null;
+
+        function updateStats() {
+            const totalFuel = appData.fuelRecords.reduce((sum, r) => sum + r.liters, 0);
+            const totalSpent = appData.fuelRecords.reduce((sum, r) => sum + (r.liters * r.price), 0);
+            const totalMaint = appData.maintenanceRecords.reduce((sum, r) => sum + (r.cost || 0), 0);
+
+            let efficiencies = [];
+            let efficiencyDetails = []; // with dates for records
+            for (let i = 1; i < appData.fuelRecords.length; i++) {
+                const km = appData.fuelRecords[i].odometer - appData.fuelRecords[i-1].odometer;
+                const liters = appData.fuelRecords[i].liters;
+                if (km > 0 && liters > 0) {
+                    const eff = km / liters;
+                    efficiencies.push(eff);
+                    efficiencyDetails.push({ value: eff, date: appData.fuelRecords[i].date, km, liters });
+                }
+            }
+
+            const bestEff = efficiencies.length > 0 ? Math.max(...efficiencies) : 0;
+            const avgEff = efficiencies.length > 0 ? efficiencies.reduce((a, b) => a + b, 0) / efficiencies.length : 0;
+
+            document.getElementById('statTotalFuel').textContent = `${totalFuel.toFixed(0)} L`;
+            document.getElementById('statTotalSpent').textContent = `$${totalSpent.toFixed(0)}`;
+            document.getElementById('statBestEfficiency').textContent = bestEff > 0 ? `${bestEff.toFixed(1)} km/L` : '--';
+            document.getElementById('statAvgEfficiency').textContent = avgEff > 0 ? `${avgEff.toFixed(1)} km/L` : '--';
+            document.getElementById('statTotalMaint').textContent = `$${totalMaint.toFixed(0)}`;
+            document.getElementById('statRecords').textContent = appData.fuelRecords.length + appData.maintenanceRecords.length;
+
+            // ── 💵 Costo por Kilómetro ──────────────────────────
+            const sorted = [...appData.fuelRecords].sort((a, b) => a.odometer - b.odometer);
+            const totalKmDriven = sorted.length >= 2 ? sorted[sorted.length - 1].odometer - sorted[0].odometer : 0;
+
+            if (totalKmDriven > 0) {
+                const fuelCostPerKm = totalSpent / totalKmDriven;
+                const maintCostPerKm = totalMaint / totalKmDriven;
+                const totalCostPerKm = fuelCostPerKm + maintCostPerKm;
+                const fuelPct = totalSpent + totalMaint > 0 ? (totalSpent / (totalSpent + totalMaint)) * 100 : 100;
+                const maintPct = 100 - fuelPct;
+
+                document.getElementById('costPerKmFuel').textContent = `$${fuelCostPerKm.toFixed(3)}`;
+                document.getElementById('costPerKmMaint').textContent = `$${maintCostPerKm.toFixed(3)}`;
+                document.getElementById('costPerKmTotal').textContent = `$${totalCostPerKm.toFixed(3)}`;
+                document.getElementById('totalKmDriven').textContent = `${totalKmDriven.toLocaleString()} km`;
+                document.getElementById('costBarFuel').style.width = `${fuelPct}%`;
+                document.getElementById('costBarMaint').style.width = `${maintPct}%`;
+                document.getElementById('costBarFuelPct').textContent = `${fuelPct.toFixed(0)}% ($${totalSpent.toFixed(0)})`;
+                document.getElementById('costBarMaintPct').textContent = `${maintPct.toFixed(0)}% ($${totalMaint.toFixed(0)})`;
+            }
+
+            // ── ⏱️ Frecuencia de Recarga ──────────────────────────
+            if (sorted.length >= 2) {
+                let daysBetween = [];
+                let kmBetween = [];
+                for (let i = 1; i < sorted.length; i++) {
+                    const d1 = new Date(sorted[i-1].date);
+                    const d2 = new Date(sorted[i].date);
+                    const diffDays = Math.max(1, Math.round((d2 - d1) / (1000 * 60 * 60 * 24)));
+                    const diffKm = sorted[i].odometer - sorted[i-1].odometer;
+                    daysBetween.push(diffDays);
+                    if (diffKm > 0) kmBetween.push(diffKm);
+                }
+
+                const avgDays = daysBetween.reduce((a,b) => a+b, 0) / daysBetween.length;
+                const avgKm = kmBetween.length > 0 ? kmBetween.reduce((a,b) => a+b, 0) / kmBetween.length : 0;
+                const avgLiters = totalFuel / sorted.length;
+
+                // Fills per month: total fills / months span
+                const firstDate = new Date(sorted[0].date);
+                const lastDate = new Date(sorted[sorted.length - 1].date);
+                const monthsSpan = Math.max(1, (lastDate - firstDate) / (1000 * 60 * 60 * 24 * 30));
+                const fillsMonth = sorted.length / monthsSpan;
+
+                document.getElementById('avgDaysBetween').textContent = `${avgDays.toFixed(1)} días`;
+                document.getElementById('avgKmBetween').textContent = `${Math.round(avgKm)} km`;
+                document.getElementById('avgLitersPerFill').textContent = `${avgLiters.toFixed(1)} L`;
+                document.getElementById('fillsPerMonth').textContent = `${fillsMonth.toFixed(1)}`;
+
+                // Timeline bars
+                const timelineBars = document.getElementById('refuelTimelineBars');
+                if (timelineBars) {
+                    const maxLiters = Math.max(...sorted.map(r => r.liters));
+                    timelineBars.innerHTML = [...sorted].reverse().slice(0, 6).map(r => {
+                        const pct = (r.liters / maxLiters) * 100;
+                        const cost = (r.liters * r.price);
+                        return `<div style="display: flex; align-items: center; gap: 10px;">
+                            <span style="min-width: 70px; font-size: 0.72rem; color: var(--chrome);">${formatDate(r.date)}</span>
+                            <div style="flex: 1; height: 8px; background: rgba(255,255,255,0.06); border-radius: 4px; overflow: hidden;">
+                                <div style="width: ${pct}%; height: 100%; background: linear-gradient(90deg, var(--mustang-red), var(--amber)); border-radius: 4px; transition: width 0.6s;"></div>
+                            </div>
+                            <span style="min-width: 45px; text-align: right; font-family: 'Orbitron', sans-serif; font-size: 0.65rem; color: var(--amber);">${r.liters.toFixed(0)}L</span>
+                            <span style="min-width: 40px; text-align: right; font-size: 0.7rem; color: ${cost > 0 ? 'var(--green)' : 'var(--chrome)'};">${cost > 0 ? '$' + cost.toFixed(0) : 'gratis'}</span>
+                        </div>`;
+                    }).join('');
+                }
+            }
+
+            // ── 🏆 Récords Personales ──────────────────────────
+            if (efficiencyDetails.length > 0) {
+                // Best efficiency
+                const best = efficiencyDetails.reduce((a, b) => a.value > b.value ? a : b);
+                document.getElementById('recordBestEff').textContent = `${best.value.toFixed(1)} km/L`;
+                document.getElementById('recordBestEffDate').textContent = `${formatDate(best.date)} · ${best.km} km con ${best.liters}L`;
+
+                // Worst efficiency
+                const worst = efficiencyDetails.reduce((a, b) => a.value < b.value ? a : b);
+                document.getElementById('recordWorstEff').textContent = `${worst.value.toFixed(1)} km/L`;
+                document.getElementById('recordWorstEffDate').textContent = `${formatDate(worst.date)} · ${worst.km} km con ${worst.liters}L`;
+            }
+
+            // Biggest fill
+            if (sorted.length > 0) {
+                const biggestFill = sorted.reduce((a, b) => a.liters > b.liters ? a : b);
+                document.getElementById('recordBiggestFill').textContent = `${biggestFill.liters.toFixed(1)} L`;
+                document.getElementById('recordBiggestFillDate').textContent = formatDate(biggestFill.date);
+            }
+
+            // Longest km stretch between fills
+            if (sorted.length >= 2) {
+                let longestKm = { km: 0, date: '' };
+                for (let i = 1; i < sorted.length; i++) {
+                    const km = sorted[i].odometer - sorted[i-1].odometer;
+                    if (km > longestKm.km) {
+                        longestKm = { km, date: sorted[i].date };
+                    }
+                }
+                document.getElementById('recordLongestStretch').textContent = `${longestKm.km.toLocaleString()} km`;
+                document.getElementById('recordLongestStretchDate').textContent = formatDate(longestKm.date);
+
+                // Most expensive single fill
+                const withCost = sorted.filter(r => r.price > 0);
+                if (withCost.length > 0) {
+                    const mostExpensive = withCost.reduce((a, b) => (a.liters * a.price) > (b.liters * b.price) ? a : b);
+                    const cost = mostExpensive.liters * mostExpensive.price;
+                    document.getElementById('recordMostExpensive').textContent = `$${cost.toFixed(2)}`;
+                    document.getElementById('recordMostExpensiveDate').textContent = `${formatDate(mostExpensive.date)} · ${mostExpensive.liters}L a $${mostExpensive.price}/L`;
+                }
+
+                // Longest days between refuels
+                let longestDays = { days: 0, dateFrom: '', dateTo: '' };
+                for (let i = 1; i < sorted.length; i++) {
+                    const d1 = new Date(sorted[i-1].date);
+                    const d2 = new Date(sorted[i].date);
+                    const diffDays = Math.round((d2 - d1) / (1000 * 60 * 60 * 24));
+                    if (diffDays > longestDays.days) {
+                        longestDays = { days: diffDays, dateFrom: sorted[i-1].date, dateTo: sorted[i].date };
+                    }
+                }
+                document.getElementById('recordLongestDays').textContent = `${longestDays.days} días`;
+                document.getElementById('recordLongestDaysDate').textContent = `${formatDate(longestDays.dateFrom)} → ${formatDate(longestDays.dateTo)}`;
+            }
+
+            // ── 🔮 Proyección de Gastos ──────────────────────────
+            const projContent = document.getElementById('projectionContent');
+            if (sorted.length >= 2) {
+                const firstD = new Date(sorted[0].date);
+                const lastD = new Date(sorted[sorted.length - 1].date);
+                const daysTracked = Math.max(1, (lastD - firstD) / (1000 * 60 * 60 * 24));
+                const monthsTracked = daysTracked / 30;
+
+                const monthlyFuelCost = totalSpent / monthsTracked;
+                const monthlyMaintCost = totalMaint / monthsTracked;
+                const monthlyCombined = monthlyFuelCost + monthlyMaintCost;
+                const monthlyKm = totalKmDriven / monthsTracked;
+
+                projContent.innerHTML = `
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                        <div style="padding: 12px; background: rgba(0,230,118,0.06); border-radius: 8px; border: 1px solid rgba(0,230,118,0.15);">
+                            <div style="font-size: 0.7rem; color: var(--chrome); text-transform: uppercase; letter-spacing: 1px;">Promedio mensual gasolina</div>
+                            <div style="font-family: 'Orbitron', sans-serif; font-size: 1.2rem; color: var(--green); margin-top: 4px;">$${monthlyFuelCost.toFixed(0)}</div>
+                        </div>
+                        <div style="padding: 12px; background: rgba(41,182,246,0.06); border-radius: 8px; border: 1px solid rgba(41,182,246,0.15);">
+                            <div style="font-size: 0.7rem; color: var(--chrome); text-transform: uppercase; letter-spacing: 1px;">Promedio mensual total</div>
+                            <div style="font-family: 'Orbitron', sans-serif; font-size: 1.2rem; color: var(--blue); margin-top: 4px;">$${monthlyCombined.toFixed(0)}</div>
+                        </div>
+                    </div>
+                    <div style="margin-top: 10px; font-size: 0.8rem; color: var(--chrome);">
+                        📊 Basado en ${Math.round(daysTracked)} días de datos · ${Math.round(monthlyKm)} km/mes promedio
+                    </div>
+                `;
+
+                // Next 3 months projections
+                const monthNames = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+                const now = new Date();
+                for (let m = 1; m <= 3; m++) {
+                    const futureMonth = new Date(now.getFullYear(), now.getMonth() + m, 1);
+                    const monthLabel = monthNames[futureMonth.getMonth()] + ' ' + futureMonth.getFullYear();
+                    document.getElementById(`projMonth${m}Label`).textContent = monthLabel;
+                    document.getElementById(`projMonth${m}`).textContent = `$${Math.round(monthlyCombined)}`;
+                }
+            } else {
+                projContent.innerHTML = '<p style="text-align: center; color: var(--chrome);">Necesitas al menos 2 registros de combustible para ver proyecciones.</p>';
+            }
+        }
+
+        let monthlyDistanceChartInstance = null;
+
+        function updateCharts() {
+            // Efficiency chart
+            const efficiencyCtx = document.getElementById('efficiencyChart');
+            if (efficiencyCtx) {
+                const efficiencyData = [];
+                for (let i = 1; i < appData.fuelRecords.length; i++) {
+                    const km = appData.fuelRecords[i].odometer - appData.fuelRecords[i-1].odometer;
+                    const liters = appData.fuelRecords[i].liters;
+                    if (km > 0 && liters > 0) {
+                        efficiencyData.push({
+                            date: appData.fuelRecords[i].date,
+                            value: km / liters
+                        });
+                    }
+                }
+
+                if (efficiencyData.length > 0) {
+                    if (efficiencyChartInstance) efficiencyChartInstance.destroy();
+
+                    efficiencyChartInstance = new Chart(efficiencyCtx, {
+                        type: 'line',
+                        data: {
+                            labels: efficiencyData.map(d => formatDate(d.date)),
+                            datasets: [{
+                                label: 'km/L',
+                                data: efficiencyData.map(d => d.value),
+                                borderColor: '#c41e3a',
+                                backgroundColor: 'rgba(196, 30, 58, 0.2)',
+                                tension: 0.4,
+                                fill: true
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: { labels: { color: '#c0c0c0', font: { family: 'Inter' } } }
+                            },
+                            scales: {
+                                y: {
+                                    ticks: { color: '#c0c0c0' },
+                                    grid: { color: 'rgba(192, 192, 192, 0.1)' }
+                                },
+                                x: {
+                                    ticks: { color: '#c0c0c0', maxRotation: 45 },
+                                    grid: { color: 'rgba(192, 192, 192, 0.1)' }
+                                }
+                            }
+                        }
+                    });
+                }
+            }
+
+            // Expenses chart
+            const expensesCtx = document.getElementById('expensesChart');
+            if (expensesCtx) {
+                const monthlyExpenses = {};
+                appData.fuelRecords.forEach(r => {
+                    const month = r.date.substring(0, 7);
+                    monthlyExpenses[month] = (monthlyExpenses[month] || 0) + (r.liters * r.price);
+                });
+
+                const labels = Object.keys(monthlyExpenses).sort().slice(-6);
+                const data = labels.map(m => monthlyExpenses[m]);
+
+                if (data.length > 0) {
+                    if (expensesChartInstance) expensesChartInstance.destroy();
+
+                    expensesChartInstance = new Chart(expensesCtx, {
+                        type: 'bar',
+                        data: {
+                            labels: labels,
+                            datasets: [{
+                                label: 'Gasto ($)',
+                                data: data,
+                                backgroundColor: 'rgba(196, 30, 58, 0.8)',
+                                borderColor: '#c41e3a',
+                                borderWidth: 2
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: { labels: { color: '#c0c0c0', font: { family: 'Inter' } } }
+                            },
+                            scales: {
+                                y: {
+                                    ticks: { color: '#c0c0c0', callback: v => '$' + v },
+                                    grid: { color: 'rgba(192, 192, 192, 0.1)' }
+                                },
+                                x: {
+                                    ticks: { color: '#c0c0c0' },
+                                    grid: { color: 'rgba(192, 192, 192, 0.1)' }
+                                }
+                            }
+                        }
+                    });
+                }
+            }
+
+            // ── 📅 Monthly Distance Chart ──────────────────────────
+            const distanceCtx = document.getElementById('monthlyDistanceChart');
+            if (distanceCtx && typeof Chart !== 'undefined') {
+                const sorted = [...appData.fuelRecords].sort((a, b) => a.odometer - b.odometer);
+                const monthlyKm = {};
+
+                for (let i = 1; i < sorted.length; i++) {
+                    const month = sorted[i].date.substring(0, 7);
+                    const km = sorted[i].odometer - sorted[i-1].odometer;
+                    if (km > 0) {
+                        monthlyKm[month] = (monthlyKm[month] || 0) + km;
+                    }
+                }
+
+                const distLabels = Object.keys(monthlyKm).sort().slice(-6);
+                const distData = distLabels.map(m => monthlyKm[m]);
+                const monthNames = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+
+                if (distData.length > 0) {
+                    if (monthlyDistanceChartInstance) monthlyDistanceChartInstance.destroy();
+
+                    monthlyDistanceChartInstance = new Chart(distanceCtx, {
+                        type: 'bar',
+                        data: {
+                            labels: distLabels.map(l => {
+                                const [y, m] = l.split('-');
+                                return monthNames[parseInt(m) - 1] + ' ' + y;
+                            }),
+                            datasets: [{
+                                label: 'Km recorridos',
+                                data: distData,
+                                backgroundColor: 'rgba(0, 230, 118, 0.7)',
+                                borderColor: '#00e676',
+                                borderWidth: 2,
+                                borderRadius: 6
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: { labels: { color: '#c0c0c0', font: { family: 'Inter' } } }
+                            },
+                            scales: {
+                                y: {
+                                    ticks: { color: '#c0c0c0', callback: v => v + ' km' },
+                                    grid: { color: 'rgba(192, 192, 192, 0.1)' }
+                                },
+                                x: {
+                                    ticks: { color: '#c0c0c0' },
+                                    grid: { color: 'rgba(192, 192, 192, 0.1)' }
+                                }
+                            }
+                        }
+                    });
+                }
+            }
+        }
+
+        // ============================================
+        // MODAL FUNCTIONS
+        // ============================================
+
+        function openModal(modalId) {
+            document.getElementById(modalId).classList.add('active');
+            // Pre-fill dates
+            const today = new Date().toISOString().split('T')[0];
+            const dateInputs = document.querySelectorAll(`#${modalId} input[type="date"]`);
+            dateInputs.forEach(input => input.value = today);
+            // Pre-fill odometer
+            const odometerInputs = document.querySelectorAll(`#${modalId} input[id*="Odometer"]`);
+            odometerInputs.forEach(input => input.value = appData.vehicle.currentOdometer);
+        }
+
+        function closeModal(modalId) {
+            document.getElementById(modalId).classList.remove('active');
+        }
+
+        // Close modal on outside click
+        document.querySelectorAll('.modal').forEach(modal => {
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) closeModal(modal.id);
+            });
+        });
+
+        // ============================================
+        // DATA MANAGEMENT
+        // ============================================
+
+        function exportData() {
+            const dataStr = JSON.stringify(appData, null, 2);
+            const blob = new Blob([dataStr], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `mustang67-backup-${new Date().toISOString().split('T')[0]}.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        function importData(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    appData = JSON.parse(e.target.result);
+                    save_data();
+                    alert('¡Datos importados correctamente!');
+                    location.reload();
+                } catch (err) {
+                    alert('Error al importar: ' + err.message);
+                }
+            };
+            reader.readAsText(file);
+        }
+
+        function clearAllData() {
+            if (confirm('¿ESTÁS SEGURO? Esto borrará TODOS los datos de tu Mustang \'67.')) {
+                if (confirm('¿Última advertencia! ¿Realmente quieres borrar todo?')) {
+                    localStorage.removeItem('mustang67Data');
+                    location.reload();
+                }
+            }
+        }
+
+        // ============================================
+        // UTILITY FUNCTIONS
+        // ============================================
+
+        function formatDate(dateStr) {
+            const date = new Date(dateStr);
+            return date.toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' });
+        }
+
+        // ============================================
+        // INITIALIZATION
+        // ============================================
+
+        // Set default dates
+        document.getElementById('fuelDate').value = new Date().toISOString().split('T')[0];
+        document.getElementById('maintDate').value = new Date().toISOString().split('T')[0];
+        document.getElementById('quickFuelDate').value = new Date().toISOString().split('T')[0];
+        document.getElementById('quickMaintDate').value = new Date().toISOString().split('T')[0];
+
+        // Load data on startup
+        load_data();
+
+        // Retry charts after all external scripts (Chart.js, Leaflet) are guaranteed loaded
+        window.addEventListener('load', function() {
+            updateCharts();
+        });
+    </script>
+
+    <!-- Chart.js and Leaflet loaded BEFORE inline script so they're available on init -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+    <!-- PWA: Registro del Service Worker -->
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('./sw.js')
+            .then(reg => console.log('✅ Service Worker registrado:', reg.scope))
+            .catch(err => console.log('❌ SW error:', err));
+        });
+      }
+    </script>
+</body>
+</html>
